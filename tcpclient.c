@@ -26,6 +26,8 @@ int main(int argc, char *argv[]) {
 	char buf_out[MAX_BUFSIZE];
 
 	servIP = argv[1];
+	if (strlen(servIP) < 7) 
+		return -1;
 
 	connfd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -34,24 +36,31 @@ int main(int argc, char *argv[]) {
 	serv_addr.sin_port = htons(DEFAULT_PORT);	
 
 	if (connect(connfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+		close(connfd);
 		perror("Error connecting to server!");
+		return -2;
 	}
 	
 	printf("Connected to server.\n");
 
 	memset(buf_in, 0, MAX_BUFSIZE);
 	memset(buf_out, 0, MAX_BUFSIZE);
-	recv(connfd, buf_in, sizeof(buf_in), 0);
-	
-	if (strlen(buf_in)) {	
-		printf("Data received: %s\n", buf_in);
-		char *input;
+
+	char input[MAX_BUFSIZE] = {0};
+	do {
 		fgets(input, MAX_BUFSIZE, stdin);
-		const char *tmp = input;
-		printf(buf_out, tmp);
-		write(connfd, buf_out, strlen(buf_out));		
-	}
-	else
-		printf("No data!");
-		
+		if (strlen(input) > 1) {
+			input[strlen(input)-1] = '\0';
+
+			sprintf(buf_out, "%s", input);
+			write(connfd, buf_out, strlen(buf_out));		
+			if (recv(connfd, buf_in, sizeof(buf_in), 0) > 0) {
+				printf("Server: %s\n", buf_in);
+			}
+		}
+		else
+			printf("Empty input!\n");
+	} while (strcmp(input, "/quit") != 0);
+
+	close(connfd);	
 }
