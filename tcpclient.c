@@ -43,17 +43,16 @@ int main(int argc, char *argv[]) {
 	
 	printf("Connected to server.\n");
 
-	memset(buf_in, 0, MAX_BUFSIZE);
-	memset(buf_out, 0, MAX_BUFSIZE);
-
 	char input[MAX_BUFSIZE] = {0};
 	do {
+		memset(buf_out, 0, MAX_BUFSIZE);
 		fgets(input, MAX_BUFSIZE, stdin);
 		if (strlen(input) > 1) {
 			input[strlen(input)-1] = '\0';
 
 			sprintf(buf_out, "%s", input);
 			write(connfd, buf_out, strlen(buf_out));		
+			memset(buf_in, 0, MAX_BUFSIZE);
 			if (recv(connfd, buf_in, sizeof(buf_in), 0) > 0) {
 				printf("Server: %s\n", buf_in);
 			}
