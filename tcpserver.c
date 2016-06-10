@@ -73,15 +73,6 @@ void send_msg_all(char *s) {
 	}
 }
 
-void strip_newline(char *s){
-	while(*s != '\0'){
-		if(*s == '\r' || *s == '\n'){
-			*s = '\0';
-		}
-		s++;
-	}
-}
-
 void sleep_ms(int milliseconds) // cross-platform sleep function
 {
 	#ifdef WIN32
