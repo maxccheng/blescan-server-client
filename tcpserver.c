@@ -1,12 +1,21 @@
+#define _BSD_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#ifdef WIN32
+#include <windows.h>
+#elif _POSIX_C_SOURCE >= 199309L
+#include <time.h>   // for nanosleep
+#else
+#include <unistd.h> // for usleep
+#endif
 
 #define MAX_CLI 200
 #define MAX_BUFSIZE 1024
@@ -73,6 +82,20 @@ void strip_newline(char *s){
 	}
 }
 
+void sleep_ms(int milliseconds) // cross-platform sleep function
+{
+	#ifdef WIN32
+		Sleep(milliseconds);
+	#elif _POSIX_C_SOURCE >= 199309L
+		struct timespec ts;
+		ts.tv_sec = milliseconds / 1000;
+		ts.tv_nsec = (milliseconds % 1000) * 1000000;
+		nanosleep(&ts, NULL);
+	#else
+		usleep(milliseconds * 1000);
+	#endif
+}
+
 void *handle_client(void *arg) {
 	char buf_in[MAX_BUFSIZE];	
 	char buf_out[MAX_BUFSIZE];	
@@ -90,6 +113,8 @@ void *handle_client(void *arg) {
 		buf_in[rlen] = '\0';
 	
 		printf("Client uid %d: %s\n", cli->uid, buf_in);	
+
+		memset(buf_out, 0, sizeof(buf_out));
 
 		//commands
 		if (buf_in[0] == '/') {
@@ -110,8 +135,10 @@ void *handle_client(void *arg) {
 				return NULL;
 			}
 		}
-		else
-			send_msg("ack", cli->uid);
+		else {
+			sprintf(buf_out, "ack");
+			send_msg(buf_out, cli->uid);
+		}
 	}	
 }
 
@@ -157,7 +184,7 @@ int main(int argc, char *argv[]) {
 		
 		add_client(cli);
 		pthread_create(&tid, NULL, &handle_client, (void *)cli);
-		
-		sleep(1);
+
+		sleep_ms(100);
 	}
 }
