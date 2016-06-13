@@ -64,15 +64,6 @@ void send_msg(char *s, int uid) {
 	}
 }
 
-void send_msg_all(char *s) {
-	for (int i=0; i<MAX_CLI; i++) {
-		if (clients[i]) {
-			write(clients[i]->fd, s, strlen(s));
-			return;
-		}
-	}
-}
-
 void sleep_ms(int milliseconds) // cross-platform sleep function
 {
 	#ifdef WIN32
