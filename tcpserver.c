@@ -87,6 +87,25 @@ void sleep_ms(int milliseconds) // cross-platform sleep function
 	#endif
 }
 
+void *handle_input(void *arg) {
+	char input[MAX_BUFSIZE];
+	memset(input, 0, sizeof(input));
+	while (fgets(input, MAX_BUFSIZE, stdin)) {
+		if (strlen(input) > 1) {
+			input[strlen(input)-1] = '\0';
+			client_t *cli = clients[0];
+			int cnt = count_cli;
+			while (cnt--) {
+				if (cli)
+					send_msg(input, cli->uid);
+				cli++;
+			}
+			printf("Broadcast to %d clients\n", count_cli);
+		}
+		memset(input, 0, sizeof(input));
+	}
+}
+
 void *handle_client(void *arg) {
 	char buf_in[MAX_BUFSIZE];	
 	char buf_out[MAX_BUFSIZE];	
@@ -138,6 +157,9 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in serv_addr;
 	struct sockaddr_in client_addr;
 	pthread_t tid;
+	pthread_t tinput;
+
+	pthread_create(&tinput, NULL, &handle_input, NULL);
 
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	serv_addr.sin_family = AF_INET;
