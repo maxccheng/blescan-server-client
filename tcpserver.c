@@ -1,12 +1,21 @@
+#define _BSD_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+
+#ifdef WIN32
+#include <windows.h>
+#elif _POSIX_C_SOURCE >= 199309L
+#include <time.h>   // for nanosleep
+#else
+#include <unistd.h> // for usleep
+#endif
 
 #define MAX_CLI 200
 #define MAX_BUFSIZE 1024
@@ -64,12 +73,36 @@ void send_msg_all(char *s) {
 	}
 }
 
-void strip_newline(char *s){
-	while(*s != '\0'){
-		if(*s == '\r' || *s == '\n'){
-			*s = '\0';
+void sleep_ms(int milliseconds) // cross-platform sleep function
+{
+	#ifdef WIN32
+		Sleep(milliseconds);
+	#elif _POSIX_C_SOURCE >= 199309L
+		struct timespec ts;
+		ts.tv_sec = milliseconds / 1000;
+		ts.tv_nsec = (milliseconds % 1000) * 1000000;
+		nanosleep(&ts, NULL);
+	#else
+		usleep(milliseconds * 1000);
+	#endif
+}
+
+void *handle_input(void *arg) {
+	char input[MAX_BUFSIZE];
+	memset(input, 0, sizeof(input));
+	while (fgets(input, MAX_BUFSIZE, stdin)) {
+		if (strlen(input) > 1) {
+			input[strlen(input)-1] = '\0';
+			client_t *cli = clients[0];
+			int cnt = count_cli;
+			while (cnt--) {
+				if (cli)
+					send_msg(input, cli->uid);
+				cli++;
+			}
+			printf("Broadcast to %d clients\n", count_cli);
 		}
-		s++;
+		memset(input, 0, sizeof(input));
 	}
 }
 
@@ -91,6 +124,8 @@ void *handle_client(void *arg) {
 	
 		printf("Client uid %d: %s\n", cli->uid, buf_in);	
 
+		memset(buf_out, 0, sizeof(buf_out));
+
 		//commands
 		if (buf_in[0] == '/') {
 			char *cmd, *param;
@@ -110,8 +145,10 @@ void *handle_client(void *arg) {
 				return NULL;
 			}
 		}
-		else
-			send_msg("ack", cli->uid);
+		else {
+			sprintf(buf_out, "ack");
+			send_msg(buf_out, cli->uid);
+		}
 	}	
 }
 
@@ -120,6 +157,9 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in serv_addr;
 	struct sockaddr_in client_addr;
 	pthread_t tid;
+	pthread_t tinput;
+
+	pthread_create(&tinput, NULL, &handle_input, NULL);
 
 	listenfd = socket(AF_INET, SOCK_STREAM, 0);
 	serv_addr.sin_family = AF_INET;
@@ -157,7 +197,7 @@ int main(int argc, char *argv[]) {
 		
 		add_client(cli);
 		pthread_create(&tid, NULL, &handle_client, (void *)cli);
-		
-		sleep(1);
+
+		sleep_ms(100);
 	}
 }
