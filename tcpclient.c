@@ -18,12 +18,33 @@ typedef struct {
 	char name[64];			//client name
 } client_t;
 
+pthread_mutex_t thread_mutex = PTHREAD_MUTEX_INITIALIZER;
+volatile int thread_count = 0;
+static int connfd;
+
+void *handle_input(void *arg) {
+	char input[MAX_BUFSIZE];
+	memset(input, 0, sizeof(input));
+	while (fgets(input, MAX_BUFSIZE, stdin)) {
+		if (strlen(input) > 1) {
+			input[strlen(input)-1] = '\0';
+			write(connfd, input, strlen(input));
+			if (strcmp(input, "/quit") == 0) {
+				pthread_mutex_lock(&thread_mutex);
+				thread_count--;
+				pthread_mutex_unlock(&thread_mutex);
+				return NULL;
+			}	
+		}
+		memset(input, 0, sizeof(input));
+	}
+}
+
 int main(int argc, char *argv[]) {
-	int connfd;
 	char *servIP;
 	struct sockaddr_in serv_addr;
-	char buf_in[MAX_BUFSIZE];
-	char buf_out[MAX_BUFSIZE];
+	char buffer[MAX_BUFSIZE];
+	pthread_t tinput;
 
 	servIP = argv[1];
 	if (strlen(servIP) < 7) 
@@ -43,23 +64,18 @@ int main(int argc, char *argv[]) {
 	
 	printf("Connected to server.\n");
 
-	char input[MAX_BUFSIZE] = {0};
-	do {
-		memset(buf_out, 0, MAX_BUFSIZE);
-		fgets(input, MAX_BUFSIZE, stdin);
-		if (strlen(input) > 1) {
-			input[strlen(input)-1] = '\0';
+	pthread_mutex_lock(&thread_mutex);
+	thread_count++;
+	pthread_mutex_unlock(&thread_mutex);
+	pthread_create(&tinput, NULL, &handle_input, NULL);
 
-			sprintf(buf_out, "%s", input);
-			write(connfd, buf_out, strlen(buf_out));		
-			memset(buf_in, 0, MAX_BUFSIZE);
-			if (recv(connfd, buf_in, sizeof(buf_in), 0) > 0) {
-				printf("Server: %s\n", buf_in);
-			}
+	memset(buffer, 0, MAX_BUFSIZE);
+	while (thread_count > 0) {
+		memset(buffer, 0, MAX_BUFSIZE);
+		if (recv(connfd, buffer, sizeof(buffer), 0) > 0) {
+			printf("Server: %s\n", buffer);
 		}
-		else
-			printf("Empty input!\n");
-	} while (strcmp(input, "/quit") != 0);
+	}
 
 	close(connfd);	
 }
