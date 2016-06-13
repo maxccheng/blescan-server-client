@@ -84,12 +84,10 @@ void *handle_input(void *arg) {
 	while (fgets(input, MAX_BUFSIZE, stdin)) {
 		if (strlen(input) > 1) {
 			input[strlen(input)-1] = '\0';
-			client_t *cli = clients[0];
-			int cnt = count_cli;
-			while (cnt--) {
-				if (cli)
-					send_msg(input, cli->uid);
-				cli++;
+			for (int i=0; i<MAX_CLI; i++) {
+				if (clients[i]) {
+					write(clients[i]->fd, input, strlen(input));
+				}
 			}
 			printf("Broadcast to %d clients\n", count_cli);
 		}
